@@ -1,0 +1,42 @@
+stages:
+  prepare:
+    cmd: >-
+      python -m catsdogs.preprocessing
+      --input data/raw
+      --output data/processed
+      --image-size ${prepare.image_size}
+      --train-ratio ${prepare.train_ratio}
+      --val-ratio ${prepare.val_ratio}
+      --seed ${prepare.seed}
+    deps:
+      - data/raw
+      - src/catsdogs/preprocessing.py
+    params:
+      - prepare
+    outs:
+      - data/processed
+  train:
+    cmd: >-
+      python -m catsdogs.train
+      --data data/processed
+      --model-output models/cats_dogs_logreg.pkl
+      --reports-dir reports
+      --feature-size ${train.feature_size}
+      --epochs ${train.epochs}
+      --learning-rate ${train.learning_rate}
+      --batch-size ${train.batch_size}
+      --l2 ${train.l2}
+      --seed ${train.seed}
+      --patience ${train.patience}
+      --augmentation
+    deps:
+      - data/processed
+      - src/catsdogs/model.py
+      - src/catsdogs/train.py
+    params:
+      - train
+    outs:
+      - reports/figures
+    metrics:
+      - reports/metrics.json:
+          cache: false

@@ -1,0 +1,70 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python -m catsdogs.preprocessing --input data/raw --output 
+      data/processed --image-size 224 --train-ratio 0.8 --val-ratio 0.1 --seed 
+      42
+    deps:
+    - path: data/raw
+      hash: md5
+      md5: 24065d336e2cb68607f318df339fe863.dir
+      size: 848866647
+      nfiles: 24999
+    - path: src/catsdogs/preprocessing.py
+      hash: md5
+      md5: 5892531325b37f3c5cac09bc94d4644b
+      size: 7275
+    params:
+      params.yaml:
+        prepare:
+          image_size: 224
+          train_ratio: 0.8
+          val_ratio: 0.1
+          test_ratio: 0.1
+          seed: 42
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: 53502ce4bfca65b859b7d09751beeb47.dir
+      size: 391328604
+      nfiles: 25000
+  train:
+    cmd: python -m catsdogs.train --data data/processed --model-output 
+      models/cats_dogs_logreg.pkl --reports-dir reports --feature-size 32 
+      --epochs 40 --learning-rate 0.0025 --batch-size 64 --l2 0.0001 --seed 42 
+      --patience 6 --augmentation
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: 53502ce4bfca65b859b7d09751beeb47.dir
+      size: 391328604
+      nfiles: 25000
+    - path: src/catsdogs/model.py
+      hash: md5
+      md5: e3b4050891fd43626c12a78c9183cbd7
+      size: 4585
+    - path: src/catsdogs/train.py
+      hash: md5
+      md5: e0e74246d0ca024ed4571bbcbbb0d596
+      size: 14628
+    params:
+      params.yaml:
+        train:
+          feature_size: 32
+          epochs: 40
+          learning_rate: 0.0025
+          batch_size: 64
+          l2: 0.0001
+          seed: 42
+          augmentation: true
+          patience: 6
+    outs:
+    - path: reports/figures
+      hash: md5
+      md5: 69312ef14849f6b52ec7a47c3b3511c5.dir
+      size: 17812
+      nfiles: 2
+    - path: reports/metrics.json
+      hash: md5
+      md5: 6d78a50b99469ff1ecd1e992f602753f
+      size: 1966

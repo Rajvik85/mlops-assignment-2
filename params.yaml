@@ -1,0 +1,15 @@
+prepare:
+  image_size: 224
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  seed: 42
+train:
+  feature_size: 32
+  epochs: 40
+  learning_rate: 0.0025
+  batch_size: 64
+  l2: 0.0001
+  seed: 42
+  augmentation: true
+  patience: 6
