@@ -68,6 +68,8 @@ def main() -> None:
             relative_text = relative.as_posix()
             if not path.is_file() or any(part in EXCLUDED_NAMES for part in relative.parts):
                 continue
+            if path.name.startswith("~$"):
+                continue
             if any(part.endswith(".egg-info") for part in relative.parts):
                 continue
             if any(relative_text == prefix or relative_text.startswith(prefix + "/") for prefix in EXCLUDED_PREFIXES):
