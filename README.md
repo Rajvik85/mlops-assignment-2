@@ -4,7 +4,7 @@ This repository implements the complete 50-mark assignment as a beginner-friendl
 
 ## Current verified result
 
-The bundled artifact was trained on all 24,998 images from the exact assignment-linked Kaggle dataset. Its metadata says `data_provenance: assignment_kaggle_dataset`. The deterministic split contains 19,998 train, 2,498 validation, and 2,502 test images. The validation-selected lightweight baseline obtained 0.6155 test accuracy, 0.6180 precision, 0.6051 recall, and 0.6115 F1. These are honest baseline results; no minimum accuracy is specified in the brief.
+The bundled scratch CNN was trained on all 24,998 images from the exact assignment-linked Kaggle dataset. Its metadata says `data_provenance: assignment_kaggle_dataset`, `pretrained: false`, and `transfer_learning: false`. The deterministic split contains 19,998 train, 2,498 validation, and 2,502 test images. The validation-selected model obtained **0.9744 test accuracy**, 0.9662 precision, 0.9832 recall, and 0.9746 F1. The held-out confusion matrix contains 1,208 correctly classified cats, 1,230 correctly classified dogs, and 64 total errors.
 
 The repository also contains a synthetic-data generator strictly for quick software smoke testing. Never replace or report the real metrics with synthetic results.
 
@@ -12,19 +12,21 @@ The repository also contains a synthetic-data generator strictly for quick softw
 
 ```text
 Kaggle data -> DVC raw pointer -> 224x224 RGB + 80/10/10 split
-            -> augmented training -> NumPy logistic baseline -> model.pkl + plots + metrics
+            -> augmented training -> scratch SimpleCNN -> checkpoint.pt + model.onnx
             -> MLflow experiment -> FastAPI -> Docker/GHCR -> Docker Compose deployment
             -> health/predict smoke tests -> logs + /metrics + labeled feedback evaluation
 ```
 
-The lightweight baseline is logistic regression over 32x32 average-pooled RGB features derived from the required 224x224 inputs. Logistic regression on pixels is explicitly allowed in the assignment and runs without a GPU.
+`SimpleCNN` has five convolutional blocks with batch normalization, ReLU activation, max pooling, dropout, and a two-class head. All 3,256,946 parameters start randomly; no pretrained weights or transfer learning are used. PyTorch trains the model, while ONNX Runtime serves the exported artifact efficiently in FastAPI and Docker. The earlier NumPy logistic implementation remains in the source as an auditable baseline comparison but is not the deployed model.
 
 ## Repository map
 
 | Path | Purpose |
 |---|---|
 | `src/catsdogs/preprocessing.py` | Validation, RGB conversion, resize/crop, deterministic split |
-| `src/catsdogs/train.py` | Augmentation, training, evaluation, plots, MLflow logging |
+| `src/catsdogs/train.py` | Retained NumPy logistic baseline and shared report helpers |
+| `src/catsdogs/cnn.py` | Beginner-readable five-block scratch CNN architecture |
+| `src/catsdogs/train_cnn.py` | Augmentation, PyTorch training, evaluation, ONNX export, MLflow logging |
 | `src/catsdogs/model.py` | Serialization and reusable inference utilities |
 | `app/main.py` | Health, prediction, feedback, Prometheus metrics, safe logs |
 | `tests/` | Data, model utility, and API tests |
@@ -70,11 +72,11 @@ pip install -e .
 pytest
 ```
 
-Expected test result: `6 passed`.
+Expected test result: `9 passed`.
 
 ## Reproduce the current real workflow
 
-With the included DVC data/cache in this working copy, rebuild and inspect the exact result:
+With the included DVC data/cache in this working copy, rebuild and inspect the result. CNN training takes several minutes and automatically uses CUDA, Apple Metal, or CPU:
 
 ```bash
 dvc repro
@@ -82,7 +84,7 @@ dvc metrics show
 mlflow ui --port 5000
 ```
 
-Open `http://127.0.0.1:5000`, select `cats-vs-dogs-baseline`, and capture the parameters, metrics, loss curve, confusion matrix, and model artifact.
+Open `http://127.0.0.1:5000`, select `cats-vs-dogs-cnn`, open `scratch-simple-cnn`, and capture the parameters, metrics, loss curve, confusion matrix, PyTorch checkpoint, and ONNX model.
 
 ## Real Kaggle workflow on a clean computer
 
@@ -110,13 +112,14 @@ dvc metrics show
 ```bash
 python - <<'PY'
 from catsdogs.model import load_model
-m = load_model("models/cats_dogs_logreg.pkl")
+m = load_model("models/cats_dogs_cnn.onnx")
 print(m["data_provenance"])
+print(m["training"]["pretrained"], m["training"]["transfer_learning"])
 print(m["test_metrics"])
 PY
 ```
 
-The first output must be `assignment_kaggle_dataset`. Review `reports/figures/loss_curve.png`, `reports/figures/confusion_matrix.png`, and `reports/metrics.json`. Keep the honest real-data results.
+The first output must be `assignment_kaggle_dataset`, and the next line must be `False False`. Review `reports/figures/loss_curve.png`, `reports/figures/confusion_matrix.png`, and `reports/metrics.json`. Never tune on the test split.
 
 5. Commit the versioned pointers, pipeline state, code, reports, and trained model:
 
@@ -131,7 +134,7 @@ The raw and processed image folders are intentionally excluded from Git. `data/r
 ## Run the API locally
 
 ```bash
-MODEL_PATH=models/cats_dogs_logreg.pkl uvicorn app.main:app --host 0.0.0.0 --port 8000
+MODEL_PATH=models/cats_dogs_cnn.onnx uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 Use a second terminal:
@@ -144,6 +147,17 @@ python scripts/smoke_test.py --base-url http://127.0.0.1:8000
 ```
 
 Interactive API documentation is at `http://127.0.0.1:8000/docs`.
+
+## Use the browser UI
+
+Open `http://127.0.0.1:8000/` after starting the API or Docker Compose. The responsive **PawSight** interface lets a beginner:
+
+1. Drag and drop or browse for a JPG, PNG, WEBP, or BMP image.
+2. Preview the selected image and replace it if needed.
+3. Select **Analyze photo**.
+4. Read the predicted class, confidence, and separate cat/dog probability bars.
+
+The page calls the same `/predict` endpoint used by automated tests. It validates file type and size in the browser, supports keyboard interaction, shows API errors clearly, and does not store the uploaded image.
 
 ## Build and deploy with Docker Compose
 
@@ -193,7 +207,8 @@ Submit the ZIP plus the separate screen recording under five minutes. The packag
 - `No module named catsdogs`: activate `.venv` and run `pip install -e .`.
 - `python` is 3.14: use `python3.12` or `py -3.12` when creating the environment.
 - DVC reports missing data: run `dvc pull`, or download the Kaggle data and `dvc add --force data/raw`.
-- API says model not found: run training and confirm `models/cats_dogs_logreg.pkl` exists.
+- API says model not found: run training and confirm both `models/cats_dogs_cnn.onnx` and `models/cats_dogs_cnn.json` exist.
+- Training is slow: confirm the first log reports an accelerated device (`mps` on Apple Silicon or `cuda` on NVIDIA); reduce `num_workers` to `0` only when debugging loader issues.
 - Docker cannot connect: start Docker Desktop/Engine and rerun `docker info`.
 - CD waits in queue: the self-hosted runner is offline or lacks the exact `mlops-deploy` label.
 - GHCR pull is denied: authenticate Docker to `ghcr.io` and check package/repository permissions.

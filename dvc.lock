@@ -29,42 +29,56 @@ stages:
       size: 391328604
       nfiles: 25000
   train:
-    cmd: python -m catsdogs.train --data data/processed --model-output 
-      models/cats_dogs_logreg.pkl --reports-dir reports --feature-size 32 
-      --epochs 40 --learning-rate 0.0025 --batch-size 64 --l2 0.0001 --seed 42 
-      --patience 6 --augmentation
+    cmd: >-
+      python -m catsdogs.train_cnn --data data/processed --model-output
+      models/cats_dogs_cnn.onnx --checkpoint-output models/cats_dogs_cnn.pt
+      --reports-dir reports --epochs 20 --learning-rate 0.001
+      --max-learning-rate 0.003 --batch-size 64 --weight-decay 0.0001 --dropout
+      0.4 --seed 42 --patience 5 --num-workers 2 --augmentation
     deps:
     - path: data/processed
       hash: md5
       md5: 53502ce4bfca65b859b7d09751beeb47.dir
       size: 391328604
       nfiles: 25000
+    - path: src/catsdogs/cnn.py
+      hash: md5
+      md5: 0157d294a7e7c9e33e6dc613dba662c1
+      size: 1917
     - path: src/catsdogs/model.py
       hash: md5
-      md5: e3b4050891fd43626c12a78c9183cbd7
-      size: 4585
-    - path: src/catsdogs/train.py
+      md5: 4bbf7a33986828b29b224d91ef3a5d3c
+      size: 7022
+    - path: src/catsdogs/train_cnn.py
       hash: md5
-      md5: e0e74246d0ca024ed4571bbcbbb0d596
-      size: 14628
+      md5: 9460be7d165fbc6a9632a4ca45485857
+      size: 15688
     params:
       params.yaml:
         train:
-          feature_size: 32
-          epochs: 40
-          learning_rate: 0.0025
+          architecture: five_block_simple_cnn
+          pretrained: false
+          transfer_learning: false
+          epochs: 20
+          learning_rate: 0.001
+          max_learning_rate: 0.003
           batch_size: 64
-          l2: 0.0001
+          weight_decay: 0.0001
+          dropout: 0.4
           seed: 42
           augmentation: true
-          patience: 6
+          patience: 5
+          num_workers: 2
     outs:
-    - path: reports/figures
+    - path: reports/figures/confusion_matrix.png
       hash: md5
-      md5: 69312ef14849f6b52ec7a47c3b3511c5.dir
-      size: 17812
-      nfiles: 2
+      md5: ebd7264452aee62f89aed587689ae262
+      size: 8133
+    - path: reports/figures/loss_curve.png
+      hash: md5
+      md5: 9293a4f16fd336687a63da0e5ad39c7c
+      size: 9158
     - path: reports/metrics.json
       hash: md5
-      md5: 6d78a50b99469ff1ecd1e992f602753f
-      size: 1966
+      md5: be8b6c317fcbac0e26c36b78ed2ed427
+      size: 5734

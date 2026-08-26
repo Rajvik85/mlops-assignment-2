@@ -1,0 +1,8 @@
+{
+  "evaluated_at_utc": "2026-08-26T18:29:10.757530+00:00",
+  "base_url": "http://127.0.0.1:8000",
+  "data_provenance": "assignment_kaggle_dataset",
+  "samples": 20,
+  "correct": 20,
+  "accuracy": 1.0
+}

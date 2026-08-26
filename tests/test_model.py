@@ -37,3 +37,29 @@ def test_image_inference_accepts_bytes():
 
     assert set(result["probabilities"]) == {"cat", "dog"}
 
+
+class DummyOnnxSession:
+    def run(self, _outputs, inputs):
+        assert inputs["images"].shape == (1, 3, 224, 224)
+        return [np.asarray([[1.0, 3.0]], dtype=np.float32)]
+
+
+def test_cnn_inference_normalizes_probabilities():
+    model = {
+        "format_version": 1,
+        "model_type": "simple_cnn_onnx",
+        "class_names": ["cat", "dog"],
+        "image_size": 224,
+        "normalization_mean": [0.485, 0.456, 0.406],
+        "normalization_std": [0.229, 0.224, 0.225],
+        "session": DummyOnnxSession(),
+        "input_name": "images",
+    }
+    buffer = io.BytesIO()
+    Image.new("RGB", (80, 60), color="gray").save(buffer, "PNG")
+
+    result = predict_image(model, buffer.getvalue())
+
+    assert result["label"] == "dog"
+    assert abs(sum(result["probabilities"].values()) - 1.0) < 1e-7
+    assert result["probabilities"]["dog"] > result["probabilities"]["cat"]

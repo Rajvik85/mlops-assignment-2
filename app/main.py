@@ -12,7 +12,7 @@ from pathlib import Path
 from threading import Lock
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from PIL import UnidentifiedImageError
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, Field
@@ -25,8 +25,9 @@ logging.basicConfig(
 )
 LOGGER = logging.getLogger("catsdogs.api")
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
-MODEL_PATH = os.getenv("MODEL_PATH", "models/cats_dogs_logreg.pkl")
+MODEL_PATH = os.getenv("MODEL_PATH", "models/cats_dogs_cnn.onnx")
 FEEDBACK_PATH = Path(os.getenv("FEEDBACK_PATH", "reports/monitoring/feedback.csv"))
+UI_PATH = Path(__file__).parent / "static" / "index.html"
 
 REQUEST_COUNT = Counter(
     "catsdogs_http_requests_total", "HTTP requests", ["method", "path", "status"]
@@ -77,9 +78,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Cats vs Dogs Inference API",
     version="1.0.0",
-    description="A reproducible baseline service for the MLOps assignment.",
+    description="A reproducible scratch-CNN service for the MLOps assignment.",
     lifespan=lifespan,
 )
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def user_interface() -> HTMLResponse:
+    """Serve the beginner-friendly image upload interface."""
+    return HTMLResponse(UI_PATH.read_text(encoding="utf-8"))
 
 
 @app.middleware("http")

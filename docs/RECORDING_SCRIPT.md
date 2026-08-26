@@ -14,19 +14,19 @@ Prepare all terminals, browser tabs, a real cat/dog image, MLflow UI, GitHub Act
 - Open `data/processed/summary.json`; show real counts and zero/known corrupt images.
 - Open `reports/metrics.json`; say the real test sample count and metrics.
 - Show loss curve and confusion matrix.
-- Explicitly confirm model provenance is `assignment_kaggle_dataset`.
+- Explicitly confirm model provenance is `assignment_kaggle_dataset`, accuracy is 97.44%, and both pretraining/transfer-learning flags are false.
 
 ## 1:10-1:45 - MLflow and tests
 
 - Show the latest MLflow run: parameters, metrics, and artifacts.
-- Run `pytest` and show all tests pass.
+- Run `pytest` and show all nine tests pass.
 - Explain one preprocessing test and one inference utility test.
 
 ## 1:45-2:25 - API, container, and monitoring
 
 - Run `docker compose ps` and show healthy status.
-- Run `python scripts/smoke_test.py` and show health plus prediction passed.
-- Open `/docs` or issue one prediction; show label and both probabilities.
+- Open `/`, upload a real image in PawSight, and show the preview, label, and both probability bars.
+- Run `python scripts/smoke_test.py` and show UI, health, and prediction passed.
 - Show a request log line with path/status/latency, then `/metrics` with non-zero counters.
 
 ## 2:25-3:30 - CI, registry, and CD
@@ -60,4 +60,3 @@ Prepare all terminals, browser tabs, a real cat/dog image, MLflow UI, GitHub Act
 - Port 8000 and MLflow port 5000 are free.
 - Real metrics and sample counts are visible.
 - Recording is under five minutes and readable at normal playback speed.
-

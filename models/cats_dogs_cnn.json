@@ -1,0 +1,55 @@
+{
+  "format_version": 1,
+  "model_type": "simple_cnn_onnx",
+  "architecture": "SimpleCNN",
+  "class_names": [
+    "cat",
+    "dog"
+  ],
+  "image_size": 224,
+  "normalization_mean": [
+    0.485,
+    0.456,
+    0.406
+  ],
+  "normalization_std": [
+    0.229,
+    0.224,
+    0.225
+  ],
+  "decision_threshold": 0.5,
+  "trained_at_utc": "2026-08-26T18:21:57.820727+00:00",
+  "data_provenance": "assignment_kaggle_dataset",
+  "training": {
+    "architecture": "five_block_simple_cnn",
+    "pretrained": false,
+    "transfer_learning": false,
+    "trainable_parameters": 3256946,
+    "epochs_configured": 20,
+    "epochs_completed": 20,
+    "early_stopping_patience": 5,
+    "learning_rate": 0.001,
+    "max_learning_rate": 0.003,
+    "batch_size": 64,
+    "weight_decay": 0.0001,
+    "dropout": 0.4,
+    "seed": 42,
+    "augmentation": true,
+    "device": "mps",
+    "train_samples": 19998,
+    "validation_samples": 2498,
+    "test_samples": 2502
+  },
+  "test_metrics": {
+    "accuracy": 0.97442,
+    "precision": 0.966222,
+    "recall": 0.983213,
+    "f1": 0.974643,
+    "loss": 0.172691,
+    "true_cat": 1208,
+    "cat_as_dog": 43,
+    "dog_as_cat": 21,
+    "true_dog": 1230,
+    "samples": 2502
+  }
+}

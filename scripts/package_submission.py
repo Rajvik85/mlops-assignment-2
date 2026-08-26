@@ -21,12 +21,24 @@ REQUIRED = [
     ".dvc/config",
     ".github/workflows/ci-cd.yml",
     "app/main.py",
-    "models/cats_dogs_logreg.pkl",
+    "models/cats_dogs_cnn.onnx",
+    "models/cats_dogs_cnn.json",
+    "models/cats_dogs_cnn.pt",
     "reports/metrics.json",
     "reports/figures/confusion_matrix.png",
     "reports/figures/loss_curve.png",
 ]
-EXCLUDED_NAMES = {".git", ".venv", "__pycache__", ".pytest_cache", "tmp", "mlruns", "dist", "dvc-storage"}
+EXCLUDED_NAMES = {
+    ".DS_Store",
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    "tmp",
+    "mlruns",
+    "dist",
+    "dvc-storage",
+}
 EXCLUDED_PREFIXES = {".dvc/cache", ".dvc/tmp", "data/raw", "data/processed", "data/demo-raw-backup"}
 
 
@@ -40,12 +52,14 @@ def main() -> None:
         raise SystemExit(f"Cannot package; missing required files: {missing}")
     from catsdogs.model import load_model
 
-    model = load_model(root / "models/cats_dogs_logreg.pkl")
+    model = load_model(root / "models/cats_dogs_cnn.onnx")
     if model.get("data_provenance") != "assignment_kaggle_dataset":
         raise SystemExit("Cannot package: model is not verified as assignment Kaggle data")
     metrics = json.loads((root / "reports/metrics.json").read_text(encoding="utf-8"))
     if metrics.get("data_provenance") != "assignment_kaggle_dataset":
         raise SystemExit("Cannot package: metrics provenance is not the assignment Kaggle data")
+    if float(metrics.get("test", {}).get("accuracy", 0.0)) < 0.90:
+        raise SystemExit("Cannot package: verified test accuracy is below 90%")
     output = root / args.output
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:

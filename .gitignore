@@ -16,10 +16,6 @@ data/raw/
 data/processed/
 data/demo-raw-backup/
 !data/raw.dvc
-reports/figures/*.png
-reports/monitoring/*.csv
-reports/monitoring/*.json
-reports/metrics.json
 *.zip
 dist/
 tmp/

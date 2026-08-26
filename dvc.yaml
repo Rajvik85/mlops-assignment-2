@@ -17,26 +17,33 @@ stages:
       - data/processed
   train:
     cmd: >-
-      python -m catsdogs.train
+      python -m catsdogs.train_cnn
       --data data/processed
-      --model-output models/cats_dogs_logreg.pkl
+      --model-output models/cats_dogs_cnn.onnx
+      --checkpoint-output models/cats_dogs_cnn.pt
       --reports-dir reports
-      --feature-size ${train.feature_size}
       --epochs ${train.epochs}
       --learning-rate ${train.learning_rate}
+      --max-learning-rate ${train.max_learning_rate}
       --batch-size ${train.batch_size}
-      --l2 ${train.l2}
+      --weight-decay ${train.weight_decay}
+      --dropout ${train.dropout}
       --seed ${train.seed}
       --patience ${train.patience}
+      --num-workers ${train.num_workers}
       --augmentation
     deps:
       - data/processed
+      - src/catsdogs/cnn.py
       - src/catsdogs/model.py
-      - src/catsdogs/train.py
+      - src/catsdogs/train_cnn.py
     params:
       - train
-    outs:
-      - reports/figures
+    plots:
+      - reports/figures/loss_curve.png:
+          cache: false
+      - reports/figures/confusion_matrix.png:
+          cache: false
     metrics:
       - reports/metrics.json:
           cache: false

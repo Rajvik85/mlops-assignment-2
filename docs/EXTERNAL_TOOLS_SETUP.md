@@ -122,11 +122,11 @@ mlflow ui --host 127.0.0.1 --port 5000
 
 Open `http://127.0.0.1:5000`, then:
 
-1. Select experiment `cats-vs-dogs-baseline`.
-2. Open the newest `numpy-logistic-baseline` run.
-3. Verify parameters such as feature size, epochs, learning rate, seed, and augmentation.
-4. Verify test accuracy, precision, recall, F1, and epoch loss.
-5. Open artifacts and show model, confusion matrix, loss curve, and metrics JSON.
+1. Select experiment `cats-vs-dogs-cnn`.
+2. Open the newest `scratch-simple-cnn` run.
+3. Verify `pretrained=false`, `transfer_learning=false`, architecture, parameter count, epochs, learning-rate bounds, seed, and augmentation.
+4. Verify train/validation loss and accuracy by epoch plus final test accuracy, precision, recall, and F1.
+5. Open artifacts and show the `.pt` checkpoint, `.onnx` deployment model, metadata JSON, confusion matrix, loss curve, and metrics JSON.
 
 `--no-mlflow` exists only for minimal debugging. Do not use it for the final assignment run.
 

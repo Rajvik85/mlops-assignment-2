@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Upload a pet photo and classify it with the Cats vs Dogs scratch CNN.">
+  <title>PawSight - Cats vs Dogs CNN</title>
+  <style>
+    :root {
+      --ink: #17231f;
+      --muted: #66726c;
+      --paper: #fffdf7;
+      --panel: rgba(255, 255, 255, 0.88);
+      --line: #dce4de;
+      --teal: #0a7b6c;
+      --teal-dark: #075b51;
+      --coral: #e56b4a;
+      --yellow: #f4c95d;
+      --shadow: 0 24px 60px rgba(32, 67, 57, 0.13);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 8%, rgba(244, 201, 93, 0.32), transparent 25rem),
+        radial-gradient(circle at 92% 92%, rgba(10, 123, 108, 0.18), transparent 28rem),
+        #f5f3eb;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input { font: inherit; }
+
+    .shell {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 24px 0 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 54px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      font-size: 1.2rem;
+    }
+
+    .mark {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 13px;
+      color: white;
+      background: var(--teal);
+      box-shadow: 0 8px 20px rgba(10, 123, 108, 0.25);
+      font-size: 1.2rem;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.68);
+      font-size: 0.84rem;
+      font-weight: 650;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #a0aaa5;
+    }
+
+    .status.online .status-dot {
+      background: #27a875;
+      box-shadow: 0 0 0 4px rgba(39, 168, 117, 0.13);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+      gap: 56px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+      color: var(--teal-dark);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 26px;
+      height: 2px;
+      background: var(--coral);
+    }
+
+    h1 {
+      max-width: 580px;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(3rem, 6vw, 5.35rem);
+      font-weight: 600;
+      line-height: 0.96;
+      letter-spacing: -0.055em;
+    }
+
+    h1 em {
+      color: var(--teal);
+      font-style: italic;
+      font-weight: 500;
+    }
+
+    .intro {
+      max-width: 520px;
+      margin: 24px 0 26px;
+      color: var(--muted);
+      font-size: 1.04rem;
+      line-height: 1.7;
+    }
+
+    .facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .fact {
+      padding: 9px 12px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid var(--line);
+      color: #48554f;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .workspace {
+      position: relative;
+      overflow: hidden;
+      padding: 26px;
+      border: 1px solid rgba(255,255,255,0.85);
+      border-radius: 28px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .workspace::after {
+      content: "";
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      right: -55px;
+      top: -65px;
+      border-radius: 50%;
+      background: rgba(244, 201, 93, 0.35);
+      pointer-events: none;
+    }
+
+    .workspace-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .workspace h2 {
+      margin: 0 0 5px;
+      font-size: 1.2rem;
+      letter-spacing: -0.025em;
+    }
+
+    .workspace-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .step {
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      width: 30px;
+      height: 30px;
+      color: white;
+      border-radius: 50%;
+      background: var(--coral);
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    .drop-zone {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 260px;
+      overflow: hidden;
+      border: 1.5px dashed #aebdb5;
+      border-radius: 20px;
+      background: var(--paper);
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragging,
+    .drop-zone:focus-within {
+      border-color: var(--teal);
+      background: #f5fbf8;
+      transform: translateY(-2px);
+    }
+
+    .drop-zone input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+    }
+
+    .drop-copy { padding: 32px; }
+
+    .upload-icon {
+      display: grid;
+      place-items: center;
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 14px;
+      border-radius: 18px;
+      color: var(--teal);
+      background: #e4f3ee;
+      font-size: 1.55rem;
+      font-weight: 800;
+    }
+
+    .drop-copy strong {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 1rem;
+    }
+
+    .drop-copy span {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    #preview {
+      display: none;
+      width: 100%;
+      height: 260px;
+      object-fit: cover;
+    }
+
+    .file-row {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 13px 2px 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .file-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .clear-button {
+      border: 0;
+      padding: 4px;
+      color: var(--coral);
+      background: none;
+      cursor: pointer;
+      font-weight: 750;
+    }
+
+    .predict-button {
+      width: 100%;
+      margin-top: 18px;
+      padding: 14px 18px;
+      border: 0;
+      border-radius: 14px;
+      color: white;
+      background: var(--teal);
+      box-shadow: 0 10px 24px rgba(10, 123, 108, 0.2);
+      cursor: pointer;
+      font-weight: 800;
+      transition: background 160ms ease, transform 160ms ease, opacity 160ms ease;
+    }
+
+    .predict-button:hover:not(:disabled) {
+      background: var(--teal-dark);
+      transform: translateY(-1px);
+    }
+
+    .predict-button:disabled { opacity: 0.42; cursor: not-allowed; }
+
+    .result {
+      display: none;
+      margin-top: 18px;
+      padding: 18px;
+      border-radius: 18px;
+      background: #f1f8f5;
+      border: 1px solid #d4e9e1;
+    }
+
+    .result-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+
+    .result-label {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.7rem;
+      letter-spacing: -0.025em;
+    }
+
+    .confidence { color: var(--teal-dark); font-size: 0.82rem; font-weight: 800; }
+
+    .probability { margin-top: 11px; }
+
+    .probability-copy {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .track { height: 8px; border-radius: 99px; background: #dce7e2; overflow: hidden; }
+    .bar { width: 0; height: 100%; border-radius: inherit; transition: width 450ms ease; }
+    .bar.cat { background: var(--coral); }
+    .bar.dog { background: var(--teal); }
+
+    .error {
+      display: none;
+      margin-top: 14px;
+      padding: 11px 13px;
+      border-radius: 12px;
+      color: #8e3428;
+      background: #fff0ec;
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 54px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    footer nav { display: flex; gap: 18px; }
+    footer a { color: var(--teal-dark); text-decoration: none; font-weight: 750; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 860px) {
+      .topbar { margin-bottom: 36px; }
+      .hero { grid-template-columns: 1fr; gap: 34px; }
+      .copy { text-align: center; }
+      .intro { margin-inline: auto; }
+      .facts { justify-content: center; }
+      .workspace { width: min(590px, 100%); margin: 0 auto; }
+    }
+
+    @media (max-width: 520px) {
+      .shell { width: min(100% - 20px, 1120px); padding-top: 14px; }
+      .topbar { margin-bottom: 28px; }
+      .status-label { display: none; }
+      h1 { font-size: 3.15rem; }
+      .workspace { padding: 17px; border-radius: 22px; }
+      .drop-zone, #preview { min-height: 230px; height: 230px; }
+      footer { flex-direction: column; text-align: center; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="mark" aria-hidden="true">P</span> PawSight</div>
+      <div id="service-status" class="status" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span class="status-label">Checking model</span>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="copy">
+        <div class="eyebrow">Cats vs Dogs classifier</div>
+        <h1>One photo.<br><em>One clever guess.</em></h1>
+        <p class="intro">Upload a clear pet photo and the scratch-trained CNN will estimate whether it shows a cat or dog. Your image is processed for this prediction and is not written to disk.</p>
+        <div class="facts" aria-label="Model facts">
+          <span class="fact">97.44% test accuracy</span>
+          <span class="fact">No transfer learning</span>
+          <span class="fact">24,998 training images</span>
+        </div>
+      </div>
+
+      <section class="workspace" aria-labelledby="workspace-title">
+        <div class="workspace-header">
+          <div>
+            <h2 id="workspace-title">Try the model</h2>
+            <p>Choose one JPG, PNG, WEBP, or BMP up to 10 MB.</p>
+          </div>
+          <span class="step" aria-hidden="true">01</span>
+        </div>
+
+        <label id="drop-zone" class="drop-zone" for="image-input" tabindex="0">
+          <input id="image-input" type="file" accept="image/jpeg,image/png,image/webp,image/bmp">
+          <div id="drop-copy" class="drop-copy">
+            <span class="upload-icon" aria-hidden="true">+</span>
+            <strong>Drop a pet photo here</strong>
+            <span>or click to browse your device</span>
+          </div>
+          <img id="preview" alt="Selected pet preview">
+        </label>
+
+        <div id="file-row" class="file-row">
+          <span id="file-name" class="file-name"></span>
+          <button id="clear-button" class="clear-button" type="button">Choose another</button>
+        </div>
+
+        <button id="predict-button" class="predict-button" type="button" disabled>Analyze photo</button>
+        <div id="error" class="error" role="alert"></div>
+
+        <section id="result" class="result" aria-live="polite" aria-labelledby="result-label">
+          <div class="result-heading">
+            <strong id="result-label" class="result-label"></strong>
+            <span id="confidence" class="confidence"></span>
+          </div>
+          <div class="probability">
+            <div class="probability-copy"><span>Cat</span><span id="cat-value">0%</span></div>
+            <div class="track"><div id="cat-bar" class="bar cat"></div></div>
+          </div>
+          <div class="probability">
+            <div class="probability-copy"><span>Dog</span><span id="dog-value">0%</span></div>
+            <div class="track"><div id="dog-bar" class="bar dog"></div></div>
+          </div>
+        </section>
+      </section>
+    </section>
+
+    <footer>
+      <span>Educational MLOps demonstration · Predictions are not veterinary advice.</span>
+      <nav aria-label="Technical links">
+        <a href="/docs">API docs</a>
+        <a href="/metrics">Metrics</a>
+      </nav>
+    </footer>
+  </main>
+
+  <script>
+    const input = document.getElementById("image-input");
+    const dropZone = document.getElementById("drop-zone");
+    const dropCopy = document.getElementById("drop-copy");
+    const preview = document.getElementById("preview");
+    const fileRow = document.getElementById("file-row");
+    const fileName = document.getElementById("file-name");
+    const clearButton = document.getElementById("clear-button");
+    const predictButton = document.getElementById("predict-button");
+    const result = document.getElementById("result");
+    const error = document.getElementById("error");
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/bmp"]);
+    let selectedFile = null;
+    let previewUrl = null;
+
+    function showError(message) {
+      error.textContent = message;
+      error.style.display = "block";
+      result.style.display = "none";
+    }
+
+    function clearError() {
+      error.textContent = "";
+      error.style.display = "none";
+    }
+
+    function resetSelection() {
+      selectedFile = null;
+      input.value = "";
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+      preview.removeAttribute("src");
+      preview.style.display = "none";
+      dropCopy.style.display = "block";
+      fileRow.style.display = "none";
+      result.style.display = "none";
+      predictButton.disabled = true;
+      predictButton.textContent = "Analyze photo";
+      clearError();
+    }
+
+    function useFile(file) {
+      clearError();
+      if (!file) return;
+      if (!allowedTypes.has(file.type)) {
+        resetSelection();
+        showError("Please choose a JPG, PNG, WEBP, or BMP image.");
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        resetSelection();
+        showError("This image is larger than 10 MB. Please choose a smaller file.");
+        return;
+      }
+      selectedFile = file;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(file);
+      preview.src = previewUrl;
+      preview.style.display = "block";
+      dropCopy.style.display = "none";
+      fileName.textContent = file.name;
+      fileRow.style.display = "flex";
+      predictButton.disabled = false;
+      result.style.display = "none";
+    }
+
+    input.addEventListener("change", () => useFile(input.files[0]));
+    clearButton.addEventListener("click", resetSelection);
+    dropZone.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        input.click();
+      }
+    });
+    ["dragenter", "dragover"].forEach((name) => dropZone.addEventListener(name, (event) => {
+      event.preventDefault();
+      dropZone.classList.add("dragging");
+    }));
+    ["dragleave", "drop"].forEach((name) => dropZone.addEventListener(name, (event) => {
+      event.preventDefault();
+      dropZone.classList.remove("dragging");
+    }));
+    dropZone.addEventListener("drop", (event) => useFile(event.dataTransfer.files[0]));
+
+    predictButton.addEventListener("click", async () => {
+      if (!selectedFile) return;
+      clearError();
+      predictButton.disabled = true;
+      predictButton.textContent = "Analyzing…";
+      const form = new FormData();
+      form.append("image", selectedFile);
+      try {
+        const response = await fetch("/predict", { method: "POST", body: form });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.detail || "Prediction failed.");
+        const cat = body.probabilities.cat * 100;
+        const dog = body.probabilities.dog * 100;
+        const winner = body.label === "cat" ? cat : dog;
+        document.getElementById("result-label").textContent = body.label === "cat" ? "Looks like a cat" : "Looks like a dog";
+        document.getElementById("confidence").textContent = `${winner.toFixed(1)}% confidence`;
+        document.getElementById("cat-value").textContent = `${cat.toFixed(1)}%`;
+        document.getElementById("dog-value").textContent = `${dog.toFixed(1)}%`;
+        document.getElementById("cat-bar").style.width = `${cat}%`;
+        document.getElementById("dog-bar").style.width = `${dog}%`;
+        result.style.display = "block";
+      } catch (caught) {
+        showError(caught.message || "The model could not analyze this image. Please try again.");
+      } finally {
+        predictButton.disabled = false;
+        predictButton.textContent = "Analyze again";
+      }
+    });
+
+    fetch("/health")
+      .then((response) => {
+        if (!response.ok) throw new Error();
+        return response.json();
+      })
+      .then(() => {
+        const status = document.getElementById("service-status");
+        status.classList.add("online");
+        status.querySelector(".status-label").textContent = "Model online";
+      })
+      .catch(() => {
+        document.querySelector("#service-status .status-label").textContent = "Model unavailable";
+      });
+  </script>
+</body>
+</html>

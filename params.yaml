@@ -5,11 +5,16 @@ prepare:
   test_ratio: 0.1
   seed: 42
 train:
-  feature_size: 32
-  epochs: 40
-  learning_rate: 0.0025
+  architecture: five_block_simple_cnn
+  pretrained: false
+  transfer_learning: false
+  epochs: 20
+  learning_rate: 0.001
+  max_learning_rate: 0.003
   batch_size: 64
-  l2: 0.0001
+  weight_decay: 0.0001
+  dropout: 0.4
   seed: 42
   augmentation: true
-  patience: 6
+  patience: 5
+  num_workers: 2

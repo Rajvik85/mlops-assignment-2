@@ -23,6 +23,10 @@ def sample_image() -> bytes:
 def run(base_url: str, timeout: float = 15.0) -> None:
     base = base_url.rstrip("/")
     with httpx.Client(timeout=timeout) as client:
+        interface = client.get(f"{base}/")
+        interface.raise_for_status()
+        if "PawSight" not in interface.text:
+            raise RuntimeError("Browser interface did not load")
         health = client.get(f"{base}/health")
         health.raise_for_status()
         if health.json().get("status") != "healthy":
@@ -40,7 +44,7 @@ def run(base_url: str, timeout: float = 15.0) -> None:
             raise RuntimeError(f"Missing probabilities: {body}")
         if abs(sum(probabilities.values()) - 1.0) > 1e-5:
             raise RuntimeError(f"Probabilities do not sum to one: {body}")
-    print(f"Smoke test passed: health=healthy label={body['label']}")
+    print(f"Smoke test passed: ui=ready health=healthy label={body['label']}")
 
 
 def main() -> None:
@@ -57,4 +61,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

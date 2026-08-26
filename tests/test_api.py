@@ -29,11 +29,15 @@ def test_health_and_prediction_endpoints(tmp_path, monkeypatch):
     buffer = io.BytesIO()
     Image.new("RGB", (60, 80), color="blue").save(buffer, "JPEG")
     with TestClient(api_module.app) as client:
+        interface = client.get("/")
         health = client.get("/health")
         prediction = client.post(
             "/predict", files={"image": ("sample.jpg", buffer.getvalue(), "image/jpeg")}
         )
 
+    assert interface.status_code == 200
+    assert "PawSight" in interface.text
+    assert 'id="drop-zone"' in interface.text
     assert health.status_code == 200
     assert health.json()["status"] == "healthy"
     assert prediction.status_code == 200

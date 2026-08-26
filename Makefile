@@ -15,13 +15,13 @@ prepare:
 	.venv/bin/python -m catsdogs.preprocessing --input data/raw --output data/processed
 
 train:
-	.venv/bin/python -m catsdogs.train --data data/processed --model-output models/cats_dogs_logreg.pkl --reports-dir reports --augmentation
+	.venv/bin/python -m catsdogs.train_cnn --data data/processed --model-output models/cats_dogs_cnn.onnx --checkpoint-output models/cats_dogs_cnn.pt --reports-dir reports
 
 test:
 	.venv/bin/pytest
 
 run:
-	MODEL_PATH=models/cats_dogs_logreg.pkl .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+	MODEL_PATH=models/cats_dogs_cnn.onnx .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 smoke:
 	.venv/bin/python scripts/smoke_test.py --base-url http://localhost:8000
@@ -34,4 +34,3 @@ compose-down:
 
 package:
 	.venv/bin/python scripts/package_submission.py
-

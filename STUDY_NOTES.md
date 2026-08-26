@@ -17,7 +17,7 @@ The key idea is traceability: a code/data/parameter version should lead to a kno
 1. Git versions code and configuration.
 2. DVC versions large data and records a two-stage pipeline.
 3. Preprocessing validates each image, converts it to RGB, center-crops/resizes it to 224x224, and creates deterministic stratified splits.
-4. Training extracts compact pooled-pixel features, augments the training features, fits logistic regression, evaluates the untouched test split, and serializes the model.
+4. Training augments only the training images, fits a five-block CNN from random weights, selects the lowest-validation-loss checkpoint, evaluates the untouched test split once, and exports PyTorch and ONNX artifacts.
 5. MLflow records parameters, per-epoch loss, test metrics, the model, and plots.
 6. FastAPI loads the artifact once and exposes health, prediction, feedback, and Prometheus metric routes.
 7. Docker locks the runtime and runs the API as a non-root user.
@@ -44,8 +44,8 @@ DVC stores a small pointer file such as `data/raw.dvc` in Git. The pointer conta
 ```text
 data/raw + preprocessing.py + prepare params
                     -> data/processed
-data/processed + model.py + train.py + train params
-                    -> reports/figures + reports/metrics + model artifact
+data/processed + cnn.py + train_cnn.py + train params
+                    -> reports/figures + reports/metrics + CNN artifacts
 ```
 
 The small model is also committed directly here so a credential-free GitHub runner can build the inference image. The raw and processed datasets remain DVC-managed.
@@ -82,51 +82,45 @@ Real image collections often contain truncated/non-image files. Preprocessing sk
 
 Augmentation creates label-preserving variants only for training. This solution randomly applies:
 
+- Resized crop with 78%-100% retained area.
 - Horizontal flip.
-- Brightness scaling between 0.85 and 1.15.
+- Small brightness, contrast, and saturation changes.
+- Rotation up to 8 degrees.
 
 Validation and test data are never augmented. Augmenting evaluation data would make metrics inconsistent and could leak tuning decisions.
 
 Augmentation helps a model rely less on accidental orientation and lighting. It does not create new semantic information and cannot fix biased or incorrect labels.
 
-## 6. Baseline model mathematics
+## 6. Scratch CNN architecture and mathematics
 
-Each 224x224 RGB image contains 150,528 values. Using every pixel directly would make a CPU baseline unnecessarily slow. Average pooling divides it into 32x32 spatial blocks, giving:
+The deployed model is a convolutional neural network trained entirely from random initialization. It does not download, freeze, or reuse external model weights. The metadata makes this auditable with `pretrained: false` and `transfer_learning: false`.
 
-```text
-32 x 32 x 3 = 3,072 features
-```
-
-Features are standardized using training-only statistics:
+Each of the five convolutional blocks contains:
 
 ```text
-z_j = (x_j - mean_j) / std_j
+3x3 convolution -> batch normalization -> ReLU
+3x3 convolution -> batch normalization -> ReLU -> 2x2 max pool
 ```
 
-The binary logistic model computes a logit:
+The channel counts are 16, 32, 64, 128, and 192. Max pooling changes the spatial dimensions as follows:
 
 ```text
-s = w dot z + b
+224 -> 112 -> 56 -> 28 -> 14 -> 7
 ```
 
-The dog probability is the sigmoid:
+The final 192x7x7 feature map is flattened. Dropout, a 256-unit dense layer, another dropout layer, and a two-unit output layer produce cat and dog logits. The model has 3,256,946 trainable parameters.
+
+A convolution learns a small filter and slides it across the image. The same filter detects a pattern wherever it appears, which is called weight sharing. Early layers tend to learn edges and colors; deeper layers combine them into textures, parts, and animal-level patterns. ReLU adds non-linearity, batch normalization stabilizes activations, pooling reduces spatial size, and dropout discourages dependence on individual neurons.
+
+The output logits `z_cat` and `z_dog` become probabilities through softmax:
 
 ```text
-P(dog | x) = 1 / (1 + exp(-s))
-P(cat | x) = 1 - P(dog | x)
+P(class i | x) = exp(z_i) / [exp(z_cat) + exp(z_dog)]
 ```
 
-At threshold 0.5, dog is predicted when `P(dog) >= 0.5`; otherwise cat.
+Training minimizes cross-entropy with small label smoothing. AdamW updates weights with decoupled weight decay. OneCycle first raises and then lowers the learning rate, enabling rapid learning followed by fine refinement. The checkpoint with the lowest validation loss is retained; the test set is not used for epoch selection.
 
-Training minimizes binary cross-entropy plus L2 regularization:
-
-```text
-loss = -mean[y log(p) + (1-y) log(1-p)] + lambda * ||w||^2
-```
-
-Mini-batch gradient descent updates weights after each batch. L2 discourages extreme weights and helps generalization. The model keeps weights from the epoch with lowest validation loss.
-
-This baseline is explainable and CPU-friendly but cannot learn complex translation-invariant visual features like a CNN. A good extension would compare it with transfer learning, but the assignment requires at least one baseline, not necessarily the highest possible accuracy.
+The old NumPy logistic-regression implementation remains as a comparison baseline. Its 61.55% score explains why spatial feature learning is important, but it is not the deployed artifact.
 
 ## 7. Metrics and confusion matrix
 
@@ -148,7 +142,7 @@ F1        = 2 * precision * recall / (precision + recall)
 
 Accuracy alone can mislead on imbalanced data. Precision answers “when the model says dog, how often is it right?” Recall answers “of all real dogs, how many did it find?” The confusion matrix shows error direction.
 
-Always report the test sample size. The bundled real-data result uses 2,502 held-out images and achieves 0.6155 accuracy. The modest score is consistent with a simple linear pooled-pixel baseline and leaves clear room for a CNN extension.
+Always report the test sample size. The bundled real-data scratch CNN uses 2,502 held-out images and achieves 0.974420 accuracy, 0.966222 precision, 0.983213 recall, and 0.974643 F1. It correctly classifies 1,208 cats and 1,230 dogs, with 43 cats predicted as dogs and 21 dogs predicted as cats. The separately executed ONNX artifact reproduces the same classification metrics.
 
 ## 8. Why MLflow is different from DVC
 
@@ -158,26 +152,29 @@ MLflow answers: across many training attempts, which parameter/metric/artifact c
 
 This solution logs:
 
-- Parameters: feature size, epochs, learning rate, batch size, L2, seed, augmentation.
-- Metrics: train and validation loss by epoch; test accuracy, precision, recall, F1, and loss.
-- Artifacts: serialized model, loss curve, confusion matrix, metrics JSON.
+- Parameters: architecture, no-pretraining flags, parameter count, epochs, learning-rate bounds, batch size, weight decay, dropout, seed, augmentation, device, and sample counts.
+- Metrics: train/validation loss and accuracy by epoch; test accuracy, precision, recall, F1, and loss.
+- Artifacts: PyTorch checkpoint, ONNX model, JSON metadata, loss curve, confusion matrix, and metrics JSON.
 
 MLflow local storage is suitable for demonstration. A team would run a shared tracking server with durable artifact storage and access controls.
 
 ## 9. Model serialization
 
-The `.pkl` file stores a schema-controlled dictionary:
+Two complementary artifacts are saved:
 
-- Format version and model type.
-- Weights and bias.
-- Feature mean and standard deviation.
-- Image and feature sizes.
-- Ordered class names and threshold.
-- Training settings, time, provenance, and test metrics.
+- `cats_dogs_cnn.pt` contains the PyTorch state dictionary and architecture settings for reproducible research or continued training.
+- `cats_dogs_cnn.onnx` contains the framework-neutral inference graph used by FastAPI and Docker.
+- `cats_dogs_cnn.json` stores ordered classes, input size, normalization, provenance, training settings, no-transfer-learning flags, and test metrics.
 
-Loading validates required fields and array shapes so corruption or an incompatible artifact fails early. Pickle can execute code during loading; the service must load only the project-generated trusted artifact.
+At startup, the service loads the ONNX graph into ONNX Runtime and validates the metadata schema. Serving ONNX avoids shipping the much larger training framework in the production container and avoids the arbitrary-code risk associated with loading untrusted pickle files.
 
 ## 10. API design
+
+### Browser UX at `/`
+
+The PawSight page is a thin presentation layer served by FastAPI. It provides drag-and-drop selection, image preview, client-side type/size checks, a loading state, accessible status messages, and probability bars. JavaScript sends the selected file to `/predict` using multipart form data. Keeping UI and API on the same origin avoids extra cross-origin configuration and gives beginners one URL to remember.
+
+The UI does not contain a second model and does not calculate its own prediction. The API remains the single source of truth, so command-line, Swagger, automated tests, and browser users all exercise the same inference code.
 
 ### `GET /health`
 
@@ -300,7 +297,7 @@ A service can be healthy and fast while making poor predictions.
 - Fixed Python range and exact package pins.
 - Explicit DVC stage dependencies and parameters.
 - Random seed 42 for split, augmentation sequence, and training.
-- Training-only normalization statistics stored with the model.
+- Fixed RGB normalization constants stored with the model.
 - Validated artifact schema.
 - Immutable image SHA.
 - Automated tests and smoke tests.
@@ -317,7 +314,9 @@ Perfect bit-for-bit reproducibility may still vary across operating systems or N
 | Grayscale/RGBA crashes | Forced RGB conversion |
 | Corrupt file stops entire run | Skip and audit reason |
 | Augmenting test images | Augmentation restricted to training |
-| Data leakage in normalization | Mean/std computed only on train |
+| Data leakage into tuning | Test set is evaluated only after validation checkpoint selection |
+| Accidentally using transfer learning | Metadata records both pretraining flags as false |
+| Training/runtime mismatch | Exported ONNX is independently evaluated on all test images |
 | Reporting demo accuracy as real | Artifact provenance and warnings |
 | API starts without model | Lifespan load fails fast |
 | Logging sensitive image data | Metadata-only logging |
@@ -332,9 +331,15 @@ Perfect bit-for-bit reproducibility may still vary across operating systems or N
 
 **Why 224x224?** It is the assignment requirement and a common input size for standard CNN backbones, giving a consistent tensor shape.
 
-**Why logistic regression?** The brief explicitly allows it as a baseline. It is fast, explainable, CPU-only, and useful as a reference before a CNN.
+**Why a simple CNN?** Convolutions learn local and translation-tolerant spatial patterns such as edges, fur, ears, and faces. The assignment explicitly permits a simple CNN, and this one reaches 97.44% without external weights.
 
-**Why pool to 32x32?** It reduces 150,528 pixel values to 3,072 while retaining coarse color/spatial information, making laptop training practical.
+**Did you use transfer learning?** No. All 3,256,946 parameters start randomly. The code creates `SimpleCNN` directly, and artifact metadata records `pretrained=false` and `transfer_learning=false`.
+
+**Why five blocks?** Repeated convolution and pooling grows the receptive field while reducing 224x224 inputs to compact 7x7 feature maps. This is deep enough for the dataset but still easy to explain.
+
+**Why batch normalization and dropout?** Batch normalization stabilizes learning; dropout regularizes the dense head and reduces overfitting.
+
+**Why export ONNX?** PyTorch is convenient for training, while ONNX Runtime is smaller and framework-neutral for production inference. Export parity was checked on all 2,502 test images.
 
 **Why validation and test sets?** Validation guides model selection; test estimates final generalization. Reusing test data for tuning biases the estimate.
 
@@ -356,7 +361,7 @@ Perfect bit-for-bit reproducibility may still vary across operating systems or N
 
 **How is post-deployment model quality measured?** Store prediction IDs with predicted/true labels, calculate metrics over representative labeled traffic, and compare over time.
 
-**What would you improve next?** Train a transfer-learning CNN, add calibration and drift checks, move MLflow/DVC to shared storage, authenticate endpoints, add Grafana alerts, scan images/dependencies, and implement automatic rollback.
+**What would you improve next?** Add probability calibration and drift checks, use identity-aware splitting if animal IDs become available, move MLflow/DVC to shared storage, authenticate endpoints, add Grafana alerts, scan images/dependencies, and implement automatic rollback.
 
 ## 21. Final evidence checklist
 
@@ -365,7 +370,7 @@ Perfect bit-for-bit reproducibility may still vary across operating systems or N
 - Real `summary.json` shows split counts and corrupt count.
 - Real loss curve, confusion matrix, metrics, sample size.
 - MLflow run includes parameters, metrics, model, and both figures.
-- Six tests pass.
+- Nine tests pass, including CNN shape and inference tests.
 - Docker/Compose service reports healthy.
 - Health and prediction smoke test passes.
 - GitHub CI, GHCR publish, CD deploy jobs are green.

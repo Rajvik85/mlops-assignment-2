@@ -1,8 +1,9 @@
-"""Serializable NumPy logistic-regression model and inference utilities."""
+"""Inference utilities for the scratch CNN and retained logistic baseline."""
 
 from __future__ import annotations
 
 import io
+import json
 import pickle
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -13,6 +14,7 @@ from catsdogs.preprocessing import preprocess_image
 
 MODEL_FORMAT_VERSION = 1
 DEFAULT_CLASS_NAMES = ("cat", "dog")
+CNN_MODEL_TYPE = "simple_cnn_onnx"
 
 
 def extract_features(image: np.ndarray, feature_size: int = 32) -> np.ndarray:
@@ -40,6 +42,25 @@ def sigmoid(values: np.ndarray | float) -> np.ndarray:
 
 
 def validate_model(model: dict[str, Any]) -> None:
+    if model.get("model_type") == CNN_MODEL_TYPE:
+        required = {
+            "format_version",
+            "model_type",
+            "class_names",
+            "image_size",
+            "normalization_mean",
+            "normalization_std",
+            "session",
+            "input_name",
+        }
+        missing = required - set(model)
+        if missing:
+            raise ValueError(f"CNN model is missing keys: {sorted(missing)}")
+        if tuple(model["class_names"]) != DEFAULT_CLASS_NAMES:
+            raise ValueError("This service expects class names ['cat', 'dog']")
+        if len(model["normalization_mean"]) != 3 or len(model["normalization_std"]) != 3:
+            raise ValueError("CNN normalization must contain three RGB values")
+        return
     required = {
         "format_version",
         "weights",
@@ -80,6 +101,25 @@ def load_model(path: str | Path) -> dict[str, Any]:
     model_path = Path(path)
     if not model_path.is_file():
         raise FileNotFoundError(f"Model artifact not found: {model_path}")
+    if model_path.suffix.casefold() == ".onnx":
+        metadata_path = model_path.with_suffix(".json")
+        if not metadata_path.is_file():
+            raise FileNotFoundError(f"CNN metadata not found: {metadata_path}")
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        try:
+            import onnxruntime as ort
+        except ImportError as exc:
+            raise RuntimeError("Install onnxruntime to serve the CNN model") from exc
+        session = ort.InferenceSession(
+            str(model_path), providers=["CPUExecutionProvider"]
+        )
+        model = {
+            **metadata,
+            "session": session,
+            "input_name": session.get_inputs()[0].name,
+        }
+        validate_model(model)
+        return model
     with model_path.open("rb") as file:
         model = pickle.load(file)  # noqa: S301 - only load trusted project artifacts.
     if not isinstance(model, dict):
@@ -110,5 +150,22 @@ def predict_image(
     readable: str | Path | BinaryIO
     readable = io.BytesIO(source) if isinstance(source, bytes) else source
     image = preprocess_image(readable, int(model["image_size"]))
+    if model.get("model_type") == CNN_MODEL_TYPE:
+        validate_model(model)
+        mean = np.asarray(model["normalization_mean"], dtype=np.float32)
+        std = np.asarray(model["normalization_std"], dtype=np.float32)
+        tensor = ((image - mean) / std).transpose(2, 0, 1)[None].astype(np.float32)
+        logits = np.asarray(
+            model["session"].run(None, {model["input_name"]: tensor})[0],
+            dtype=np.float64,
+        )[0]
+        logits -= logits.max()
+        probabilities_array = np.exp(logits) / np.exp(logits).sum()
+        probabilities = {
+            name: float(probabilities_array[index])
+            for index, name in enumerate(model["class_names"])
+        }
+        label = model["class_names"][int(np.argmax(probabilities_array))]
+        return {"label": label, "probabilities": probabilities}
     features = extract_features(image, int(model["feature_size"]))
     return predict_features(model, features)
