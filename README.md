@@ -1,6 +1,6 @@
 # MLOps Assignment 2 - Cats vs Dogs
 
-This repository implements the complete 50-mark assignment as a beginner-friendly, end-to-end MLOps pipeline. It covers Git and DVC versioning, 224x224 RGB preprocessing, class-stratified 80/10/10 splitting, augmentation, model training, MLflow tracking, FastAPI inference, Docker, GitHub Actions CI/CD, Docker Compose deployment, smoke testing, safe logging, Prometheus metrics, and post-deployment performance measurement.
+This repository implements the complete end-to-end MLOps pipeline. It covers Git and DVC versioning, 224x224 RGB preprocessing, class-stratified 80/10/10 splitting, augmentation, model training, MLflow tracking, FastAPI inference, Docker, GitHub Actions CI/CD, Docker Compose deployment, smoke testing, safe logging, Prometheus metrics, and post-deployment performance measurement.
 
 ## Current verified result
 
@@ -191,24 +191,4 @@ Every pull request runs tests, builds the image, starts it, and performs health 
 
 See `docs/EXTERNAL_TOOLS_SETUP.md` for the exact one-time runner and GitHub Environment setup.
 
-## Final package
 
-After real-data training and after saving any evidence screenshots separately:
-
-```bash
-python scripts/package_submission.py
-unzip -l dist/mlops-assignment-2-submission.zip
-```
-
-Submit the ZIP plus the separate screen recording under five minutes. The packager intentionally excludes raw/processed images, caches, virtual environments, Git history, and local MLflow storage, while retaining source, configs, DVC pointer/lock, reports, and the trained model.
-
-## Troubleshooting
-
-- `No module named catsdogs`: activate `.venv` and run `pip install -e .`.
-- `python` is 3.14: use `python3.12` or `py -3.12` when creating the environment.
-- DVC reports missing data: run `dvc pull`, or download the Kaggle data and `dvc add --force data/raw`.
-- API says model not found: run training and confirm both `models/cats_dogs_cnn.onnx` and `models/cats_dogs_cnn.json` exist.
-- Training is slow: confirm the first log reports an accelerated device (`mps` on Apple Silicon or `cuda` on NVIDIA); reduce `num_workers` to `0` only when debugging loader issues.
-- Docker cannot connect: start Docker Desktop/Engine and rerun `docker info`.
-- CD waits in queue: the self-hosted runner is offline or lacks the exact `mlops-deploy` label.
-- GHCR pull is denied: authenticate Docker to `ghcr.io` and check package/repository permissions.
